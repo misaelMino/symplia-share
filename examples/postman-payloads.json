@@ -1,0 +1,19 @@
+{
+  "createShare": {
+    "documentIds": [12, 15, 18],
+    "duracionMinutos": 30,
+    "requierePin": true,
+    "pin": "48291",
+    "permiteVisualizacion": true,
+    "permiteDescarga": true,
+    "descargarComoZip": true,
+    "singleUse": false,
+    "maxAccesos": 3,
+    "maxDescargas": 1,
+    "observaciones": "Documentación temporal para profesional"
+  },
+  "validatePin": {
+    "pin": "48291"
+  },
+  "revokeShare": {}
+}
