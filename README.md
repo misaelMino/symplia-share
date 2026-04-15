@@ -33,6 +33,59 @@ GET http://localhost:5500/health
 - `PUBLIC_BASE_URL`: base pública que usa el QR y `urlPublica`.
 - `SHARE_ACCESS_SECRET`: secreto para firmar `pinAccessToken`.
 
+### Variables del share
+
+- `FILES_BASE_PATH=C:/Users/misam/Desktop/docs`
+  Es la carpeta física donde están guardados los archivos reales. `symplia-share` usa esta base para resolver `rutaArchivo` cuando viene relativa.
+  No es una variable del front.
+  Hoy puede apuntar a una carpeta local; más adelante puede cambiarse a una carpeta montada en un VPS o en otra máquina sin tocar el código.
+
+- `PUBLIC_BASE_URL=http://localhost:8080`
+  Es la URL pública base con la que el micro arma `urlPublica` y el contenido del QR.
+  En desarrollo normalmente apunta al gateway.
+  No es una variable del front; es del microservicio.
+
+- `SHARE_TOKEN_LENGTH=48`
+  Define el largo del token público aleatorio que va dentro del link del share.
+  Mientras más largo, más difícil de adivinar.
+  No afecta al front.
+
+- `DEFAULT_PIN_LENGTH=5`
+  Define el mínimo de caracteres exigidos para el PIN cuando `requierePin=true`.
+  Si querés más seguridad, se puede subir.
+
+- `PIN_ACCESS_TOKEN_TTL_MINUTES=30`
+  Tiempo de vida del token temporal que se entrega después de validar correctamente el PIN.
+  Ese token permite acceder al share protegido sin reenviar el PIN en cada request.
+
+- `SHARE_ACCESS_SECRET=cambiar-por-un-secreto-largo-y-unico`
+  Se usa para firmar el `pinAccessToken`.
+  Tiene que ser un valor largo, privado y distinto por ambiente.
+  No debe exponerse en frontend ni en repositorio público.
+
+### Variables de integración con el gateway
+
+- `AUTH_USER_ID_HEADER=x-user-id`
+  Le dice a `symplia-share` en qué header esperar el `idUsuario` numérico del usuario autenticado.
+  Ejemplo: el gateway puede reenviar `x-user-id: 25`.
+  No lo manda manualmente el front.
+
+- `AUTH_USER_SUB_HEADER=x-auth-user-sub`
+  Le dice al micro en qué header puede llegar el `sub` del JWT, por ejemplo `auth0|abc123`.
+  Sirve como contexto de identidad, pero el campo principal para guardar `idUsuarioGenerador` es el `idUsuario` numérico.
+  Tampoco lo manda manualmente el front.
+
+- `AUTH_USER_ID_CLAIMS=https://symplia.app/idUsuario,idUsuario,user_id`
+  Si el gateway no manda `x-user-id`, el micro intenta resolver el `idUsuario` buscando estos claims dentro del payload del usuario reenviado por el gateway.
+  Se prueban en orden hasta encontrar uno válido.
+  Esto existe para que la integración sea más flexible con distintos formatos de JWT o claims custom.
+
+Resumen práctico:
+
+- Front: normalmente solo manda `Authorization: Bearer ...`.
+- Gateway: valida el JWT y reenvía headers/claims útiles al micro.
+- `symplia-share`: usa esas variables para saber dónde leer la identidad del usuario autenticado.
+
 ## Endpoints
 
 Privados:
