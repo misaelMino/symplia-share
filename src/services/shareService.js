@@ -163,7 +163,8 @@ async function createShare({ authUser, body }) {
   const publicToken = generatePublicToken(shareTokenLength);
   const shareTokenHash = sha256(publicToken);
   const pinHash = payload.requierePin ? await hashPin(payload.pin) : null;
-  const fechaExpiracion = new Date(Date.now() + (duracionMinutos * 60 * 1000));
+  const fechaCreacion = new Date();
+  const fechaExpiracion = new Date(fechaCreacion.getTime() + (duracionMinutos * 60 * 1000));
   const client = await pool.connect();
 
   try {
@@ -175,6 +176,7 @@ async function createShare({ authUser, body }) {
     const created = await shareRepository.createShare({
       codigo: provisionalCode,
       shareTokenHash,
+      fechaCreacion,
       fechaExpiracion,
       duracionMinutos,
       idUsuarioGenerador,

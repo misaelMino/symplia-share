@@ -21,6 +21,7 @@ async function createShare(data, client) {
     INSERT INTO ${schema}."ShareTemporal" (
       "codigo",
       "shareTokenHash",
+      "fechaCreacion",
       "fechaExpiracion",
       "duracionMinutos",
       "idUsuarioGenerador",
@@ -36,13 +37,14 @@ async function createShare(data, client) {
       "urlPublica",
       "observaciones"
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
     RETURNING *
   `;
 
   const values = [
     data.codigo,
     data.shareTokenHash,
+    data.fechaCreacion,
     data.fechaExpiracion,
     data.duracionMinutos,
     data.idUsuarioGenerador,
