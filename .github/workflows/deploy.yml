@@ -1,0 +1,25 @@
+name: Deploy Share
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy in VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /var/www/symplia/repos/symplia-share
+            git pull --ff-only origin master
+            npm ci
+            pm2 restart symplia-share
+            pm2 save
