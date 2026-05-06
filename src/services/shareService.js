@@ -56,6 +56,18 @@ async function transitionIfExpired(share, stateMap, client) {
   }, client);
 }
 
+function withEffectiveState(share) {
+  if (!share) return share;
+  if (share.estadoNombre === SHARE_STATES.REVOCADO || share.estadoNombre === SHARE_STATES.CONSUMIDO) {
+    return share;
+  }
+  if (!isExpired(share)) return share;
+  return {
+    ...share,
+    estadoNombre: SHARE_STATES.EXPIRADO
+  };
+}
+
 async function resolvePublicShareOrFail(plainToken, client) {
   const tokenHash = sha256(plainToken);
   const share = await shareRepository.getShareByTokenHash(tokenHash, client);
@@ -242,31 +254,55 @@ async function createShareWithQr(context) {
 }
 
 async function listSharesForUser(idUsuarioGenerador, filters = {}) {
-  const shares = await shareRepository.listSharesByUser(idUsuarioGenerador, filters);
-  return shares.map((share) => ({
-    idShareTemporal: Number(share.idShareTemporal),
-    codigo: share.codigo,
-    fechaCreacion: new Date(share.fechaCreacion).toISOString(),
-    fechaExpiracion: new Date(share.fechaExpiracion).toISOString(),
-    estado: share.estadoNombre,
-    requierePin: Boolean(share.requierePin),
-    permiteVisualizacion: Boolean(share.permiteVisualizacion),
-    permiteDescarga: Boolean(share.permiteDescarga),
-    descargarComoZip: Boolean(share.descargarComoZip),
-    accesosActuales: Number(share.accesosActuales || 0),
-    descargasActuales: Number(share.descargasActuales || 0),
-    documentCount: Number(share.documentCount || 0),
-    urlPublica: share.urlPublica
-  }));
+  const client = await pool.connect();
+
+  try {
+    const stateMap = await ensureShareStates(client);
+    const shares = await shareRepository.listSharesByUser(idUsuarioGenerador, filters, client);
+    const normalizedShares = await Promise.all(
+      shares.map(async (share) => {
+        const transitioned = await transitionIfExpired(share, stateMap, client);
+        return withEffectiveState(transitioned || share);
+      })
+    );
+
+    return normalizedShares.map((share) => ({
+      idShareTemporal: Number(share.idShareTemporal),
+      codigo: share.codigo,
+      fechaCreacion: new Date(share.fechaCreacion).toISOString(),
+      fechaExpiracion: new Date(share.fechaExpiracion).toISOString(),
+      estado: share.estadoNombre,
+      requierePin: Boolean(share.requierePin),
+      permiteVisualizacion: Boolean(share.permiteVisualizacion),
+      permiteDescarga: Boolean(share.permiteDescarga),
+      descargarComoZip: Boolean(share.descargarComoZip),
+      accesosActuales: Number(share.accesosActuales || 0),
+      descargasActuales: Number(share.descargasActuales || 0),
+      documentCount: Number(share.documentCount || 0),
+      urlPublica: share.urlPublica
+    }));
+  } finally {
+    client.release();
+  }
 }
 
 async function getShareDetailForUser(idShareTemporal, idUsuarioGenerador) {
-  const share = await shareRepository.getShareByIdForUser(idShareTemporal, idUsuarioGenerador);
-  if (!share) {
-    throw new AppError('Share no encontrado', 404, 'SHARE_NOT_FOUND');
+  const client = await pool.connect();
+
+  try {
+    const stateMap = await ensureShareStates(client);
+    const share = await shareRepository.getShareByIdForUser(idShareTemporal, idUsuarioGenerador, client);
+    if (!share) {
+      throw new AppError('Share no encontrado', 404, 'SHARE_NOT_FOUND');
+    }
+    const normalizedShare = withEffectiveState(
+      (await transitionIfExpired(share, stateMap, client)) || share
+    );
+    const documents = await shareRepository.getDocumentsByShareId(idShareTemporal, client);
+    return presentShare(normalizedShare, documents);
+  } finally {
+    client.release();
   }
-  const documents = await shareRepository.getDocumentsByShareId(idShareTemporal);
-  return presentShare(share, documents);
 }
 
 async function revokeShare(idShareTemporal, idUsuarioGenerador, req) {
