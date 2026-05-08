@@ -9,6 +9,7 @@ const { formatShareCode } = require('../utils/shareCode');
 const { presentPublicShare, presentShare } = require('../utils/sharePresenter');
 const { createPinAccessToken, verifyPinAccessToken } = require('../utils/pinAccessToken');
 const { resolveStoredPath, ensureFileExists } = require('../utils/fileResolver');
+const { isRutaArchivoR2 } = require('../storage/r2Storage');
 const SHARE_STATES = require('../constants/shareStates');
 const ACCESS_ACTIONS = require('../constants/accessActions');
 const ACCESS_RESULTS = require('../constants/accessResults');
@@ -436,8 +437,9 @@ async function resolvePublicDocumentAccess(req, plainToken, idHistorialDocumento
       throw new AppError('Documento no disponible en el share', 404, 'SHARE_DOCUMENT_NOT_FOUND');
     }
 
-    const resolvedPath = resolveStoredPath(document.rutaSnapshot);
-    if (!ensureFileExists(resolvedPath)) {
+    const isR2Document = isRutaArchivoR2(document.rutaSnapshot);
+    const resolvedPath = isR2Document ? document.rutaSnapshot : resolveStoredPath(document.rutaSnapshot);
+    if (!isR2Document && !ensureFileExists(resolvedPath)) {
       await accessLogService.register(req, {
         idShareTemporal: availableShare.idShareTemporal,
         accion: options.logAction,
@@ -512,7 +514,10 @@ async function resolvePublicZipAccess(req, plainToken) {
       throw new AppError('La descarga ZIP requiere múltiples documentos', 400, 'ZIP_REQUIRES_MULTIPLE_DOCUMENTS');
     }
 
-    const missingDocument = documents.find((document) => !ensureFileExists(resolveStoredPath(document.rutaSnapshot)));
+    const missingDocument = documents.find((document) => (
+      !isRutaArchivoR2(document.rutaSnapshot) &&
+      !ensureFileExists(resolveStoredPath(document.rutaSnapshot))
+    ));
     if (missingDocument) {
       await accessLogService.register(req, {
         idShareTemporal: availableShare.idShareTemporal,

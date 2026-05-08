@@ -50,6 +50,14 @@ module.exports = {
   defaultPinLength: Number(process.env.DEFAULT_PIN_LENGTH || 5),
   pinAccessSecret: must('SHARE_ACCESS_SECRET'),
   pinAccessTokenTtlMinutes: Number(process.env.PIN_ACCESS_TOKEN_TTL_MINUTES || 30),
+  r2: {
+    accountId: optional('R2_ACCOUNT_ID'),
+    accessKeyId: optional('R2_ACCESS_KEY_ID'),
+    secretAccessKey: optional('R2_SECRET_ACCESS_KEY'),
+    bucket: optional('R2_BUCKET'),
+    region: optional('R2_REGION', 'auto'),
+    endpoint: optional('R2_ENDPOINT'),
+  },
   auth: {
     userIdHeader: optional('AUTH_USER_ID_HEADER', 'x-user-id').toLowerCase(),
     userSubHeader: optional('AUTH_USER_SUB_HEADER', 'x-auth-user-sub').toLowerCase(),
