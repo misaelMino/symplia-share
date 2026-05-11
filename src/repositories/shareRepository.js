@@ -201,11 +201,40 @@ async function listSharesByUser(idUsuarioGenerador, filters = {}, client) {
   }
 
   const sql = `
-    SELECT s.*, e."nombre" AS "estadoNombre",
-      COUNT(std."idShareTemporalDocumento")::int AS "documentCount"
+    SELECT
+      s.*,
+      e."nombre" AS "estadoNombre",
+      COUNT(std."idShareTemporalDocumento")::int AS "documentCount",
+      COUNT(DISTINCT d."idPersona")::int AS "personCount",
+      CASE
+        WHEN COUNT(DISTINCT d."idPersona") = 1 THEN MAX(d."idPersona")
+        ELSE NULL
+      END AS "primaryIdPersona",
+      COALESCE(
+        JSONB_AGG(
+          DISTINCT JSONB_BUILD_OBJECT(
+            'idPersona', d."idPersona",
+            'nombreCompleto', NULLIF(CONCAT_WS(', ', p.apellido, p.nombre), '')
+          )
+        ) FILTER (WHERE d."idPersona" IS NOT NULL),
+        '[]'::jsonb
+      ) AS "personas",
+      COALESCE(
+        JSONB_AGG(
+          DISTINCT JSONB_BUILD_OBJECT(
+            'idDocumento', d."idDocumento",
+            'nombre', d.nombre
+          )
+        ) FILTER (WHERE d."idDocumento" IS NOT NULL),
+        '[]'::jsonb
+      ) AS "documentos"
     FROM ${schema}."ShareTemporal" s
     INNER JOIN ${schema}."EstadoShare" e ON e."idEstadoShare" = s."idEstadoShare"
     LEFT JOIN ${schema}."ShareTemporalDocumento" std ON std."idShareTemporal" = s."idShareTemporal"
+    LEFT JOIN ${schema}."HistorialDocumentoGuardado" hdg
+      ON hdg."idHistorialDocumentoGuardado" = std."idHistorialDocumentoGuardado"
+    LEFT JOIN ${schema}."Documento" d ON d."idDocumento" = hdg."idDocumento"
+    LEFT JOIN ${schema}."Persona" p ON p."idPersona" = d."idPersona"
     WHERE ${conditions.join(' AND ')}
     GROUP BY s."idShareTemporal", e."nombre"
     ORDER BY s."fechaCreacion" DESC, s."idShareTemporal" DESC
@@ -217,10 +246,19 @@ async function listSharesByUser(idUsuarioGenerador, filters = {}, client) {
 
 async function getDocumentsByShareId(idShareTemporal, client) {
   const sql = `
-    SELECT *
-    FROM ${schema}."ShareTemporalDocumento"
-    WHERE "idShareTemporal" = $1
-    ORDER BY "orden" ASC, "idShareTemporalDocumento" ASC
+    SELECT
+      std.*,
+      hdg."idDocumento",
+      d."idPersona",
+      d.nombre AS "documentoNombre",
+      NULLIF(CONCAT_WS(', ', p.apellido, p.nombre), '') AS "personaNombre"
+    FROM ${schema}."ShareTemporalDocumento" std
+    LEFT JOIN ${schema}."HistorialDocumentoGuardado" hdg
+      ON hdg."idHistorialDocumentoGuardado" = std."idHistorialDocumentoGuardado"
+    LEFT JOIN ${schema}."Documento" d ON d."idDocumento" = hdg."idDocumento"
+    LEFT JOIN ${schema}."Persona" p ON p."idPersona" = d."idPersona"
+    WHERE std."idShareTemporal" = $1
+    ORDER BY std."orden" ASC, std."idShareTemporalDocumento" ASC
   `;
   const { rows } = await executor(client).query(sql, [idShareTemporal]);
   return rows;

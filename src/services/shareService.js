@@ -69,6 +69,59 @@ function withEffectiveState(share) {
   };
 }
 
+function normalizeShareSummary(share) {
+  const personas = Array.isArray(share.personas)
+    ? share.personas
+        .map((persona) => ({
+          idPersona:
+            persona?.idPersona !== undefined && persona?.idPersona !== null
+              ? Number(persona.idPersona)
+              : null,
+          nombreCompleto: persona?.nombreCompleto || null
+        }))
+        .filter((persona) => persona.idPersona)
+    : [];
+
+  const documentos = Array.isArray(share.documentos)
+    ? share.documentos
+        .map((documento) => ({
+          idDocumento:
+            documento?.idDocumento !== undefined && documento?.idDocumento !== null
+              ? Number(documento.idDocumento)
+              : null,
+          nombre: documento?.nombre || null
+        }))
+        .filter((documento) => documento.idDocumento)
+    : [];
+
+  const personCount = Number(share.personCount || personas.length || 0);
+  const documentCount = Number(share.documentCount || documentos.length || 0);
+  const primaryIdPersona = share.primaryIdPersona !== undefined && share.primaryIdPersona !== null
+    ? Number(share.primaryIdPersona)
+    : (personCount === 1 ? personas[0]?.idPersona || null : null);
+
+  const personaResumen = personCount <= 1
+    ? (personas[0]?.nombreCompleto || (primaryIdPersona ? `Persona ${primaryIdPersona}` : null))
+    : `${personCount} personas`;
+
+  let documentosResumen = null;
+  if (documentCount === 1) {
+    documentosResumen = documentos[0]?.nombre || (documentos[0]?.idDocumento ? `Documento ${documentos[0].idDocumento}` : null);
+  } else if (documentCount > 1) {
+    const firstLabel = documentos[0]?.nombre || (documentos[0]?.idDocumento ? `Documento ${documentos[0].idDocumento}` : 'Documento');
+    documentosResumen = `${firstLabel} +${documentCount - 1}`;
+  }
+
+  return {
+    ...share,
+    personas,
+    personCount,
+    primaryIdPersona,
+    personaResumen,
+    documentosResumen
+  };
+}
+
 async function resolvePublicShareOrFail(plainToken, client) {
   const tokenHash = sha256(plainToken);
   const share = await shareRepository.getShareByTokenHash(tokenHash, client);
@@ -263,7 +316,7 @@ async function listSharesForUser(idUsuarioGenerador, filters = {}) {
     const normalizedShares = await Promise.all(
       shares.map(async (share) => {
         const transitioned = await transitionIfExpired(share, stateMap, client);
-        return withEffectiveState(transitioned || share);
+        return normalizeShareSummary(withEffectiveState(transitioned || share));
       })
     );
 
@@ -280,6 +333,11 @@ async function listSharesForUser(idUsuarioGenerador, filters = {}) {
       accesosActuales: Number(share.accesosActuales || 0),
       descargasActuales: Number(share.descargasActuales || 0),
       documentCount: Number(share.documentCount || 0),
+      personCount: Number(share.personCount || 0),
+      primaryIdPersona: share.primaryIdPersona || null,
+      personas: Array.isArray(share.personas) ? share.personas : [],
+      personaResumen: share.personaResumen || null,
+      documentosResumen: share.documentosResumen || null,
       urlPublica: share.urlPublica
     }));
   } finally {
