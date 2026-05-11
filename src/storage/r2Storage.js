@@ -4,7 +4,7 @@ const { r2 } = require('../config/env');
 const {
   S3Client,
   GetObjectCommand,
-} = require('../../..//symplia-crud/node_modules/@aws-sdk/client-s3');
+} = require('@aws-sdk/client-s3');
 
 let client = null;
 
